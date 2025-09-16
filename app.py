@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 from PyQt6.QtWidgets import QTabWidget, QSpinBox, QGroupBox
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from pathlib import Path
 
 try:
     from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -14,11 +15,70 @@ try:
                                 QPushButton, QTextEdit, QFrame, QFileDialog, 
                                 QMessageBox, QGroupBox, QSpacerItem, QSizePolicy)
     from PyQt6.QtCore import Qt, QThread, pyqtSignal
-    from PyQt6.QtGui import QFont, QPalette, QPixmap
+    from PyQt6.QtGui import QFont, QPalette, QPixmap, QFontDatabase
     PYQT_AVAILABLE = True
 except ImportError:
     PYQT_AVAILABLE = False
     print("❌ PyQt6 not found. Install with: pip install PyQt6")
+
+# ADD FONT DEBUG FUNCTIONS
+def debug_fonts():
+    """Debug font paths and availability"""
+    print("=== FONT DEBUG START ===")
+    
+    # Check if running as frozen executable
+    if getattr(sys, 'frozen', False):
+        # Running as EXE - fonts should be in _MEIPASS temp directory
+        base_path = Path(sys._MEIPASS)
+        font_path = base_path / 'fonts'
+        print(f"Running as EXE. Base path: {base_path}")
+    else:
+        # Running as script - fonts in same directory
+        base_path = Path(__file__).parent
+        font_path = base_path
+        print(f"Running as script. Base path: {base_path}")
+    
+    print(f"Font directory: {font_path}")
+    print(f"Font directory exists: {font_path.exists()}")
+    
+    if font_path.exists():
+        print("Files in font directory:")
+        for file in font_path.iterdir():
+            if file.suffix.lower() in ['.ttf', '.otf']:
+                print(f"  FONT: {file.name}")
+            else:
+                print(f"  FILE: {file.name}")
+    else:
+        print("Font directory not found!")
+        print("Checking base directory contents:")
+        if base_path.exists():
+            for file in base_path.iterdir():
+                if file.suffix.lower() in ['.ttf', '.otf']:
+                    print(f"  FONT in base: {file.name}")
+    
+    # Test specific font files
+    font_names = ["Vazir-Bold.ttf", "Vazir-Medium.ttf", "Vazir-Regular.ttf", "Vazir.ttf"]
+    found_font = None
+    
+    for font_name in font_names:
+        font_file = font_path / font_name
+        if font_file.exists():
+            print(f"✅ FOUND: {font_file}")
+            found_font = str(font_file)
+            break
+        else:
+            # Try in base directory too
+            font_file = base_path / font_name
+            if font_file.exists():
+                print(f"✅ FOUND in base: {font_file}")
+                found_font = str(font_file)
+                break
+            else:
+                print(f"❌ NOT FOUND: {font_name}")
+    
+    print(f"Selected font: {found_font}")
+    print("=== FONT DEBUG END ===")
+    return found_font
 
 class ImageCropperWidget(QWidget):
     def __init__(self):
@@ -233,9 +293,6 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
     
     def init_ui(self):
         """ایجاد رابط کاربری"""
-        # Remove these lines since we're now a widget:
-        # self.setWindowTitle("🏷️ تولیدکننده برچسب پستی حرارتی - NokhbehSho.com")
-        # self.setGeometry(200, 200, 800, 700)
         
         # تنظیم فونت برای پشتیبانی از فارسی
         font = QFont()
@@ -682,7 +739,12 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         return lines
     
     def create_address_label(self, sender_info, receiver_info, output_filename="address_label.png"):
-        """تابع ایجاد برچسب آدرس - بروزرسانی شده برای آدرس تکی"""
+        """تابع ایجاد برچسب آدرس - WITH FONT DEBUGGING"""
+        
+        print("=== CREATING LABEL WITH FONT DEBUG ===")
+        
+        # Debug fonts first
+        persian_font = debug_fonts()
         
         # تنظیمات اندازه (8cm x 5cm در 300 DPI)
         width = 945
@@ -699,54 +761,48 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         img = Image.new('L', (width, height), white)
         draw = ImageDraw.Draw(img)
         
-        # تلاش برای بارگذاری فونت‌های فارسی
+        # تلاش برای بارگذاری فونت‌های فارسی WITH DEBUG
         font_loaded = False
         try:
-            font_paths = [
-                "Vazir-Bold.ttf",
-                "Vazir-Medium.ttf", 
-                "Vazir.ttf",
-                "Sahel-Bold.ttf",
-                "Sahel.ttf",
-                "IRANSans.ttf",
-                "B Nazanin.ttf",
-                "Yekan.ttf"
-            ]
-            
-            font_file = None
-            bold_font = None
-            for path in font_paths:
-                if os.path.exists(path):
-                    if "Bold" in path and not bold_font:
-                        bold_font = path
-                    if not font_file:
-                        font_file = path
-            
-            if not font_file:
-                raise Exception("فونت فارسی یافت نشد")
+            if persian_font and os.path.exists(persian_font):
+                print(f"Loading PIL fonts from: {persian_font}")
                 
-            # استفاده از فونت Bold برای عناوین اگر موجود بود
-            title_font_file = bold_font if bold_font else font_file
-            
-            # بارگذاری فونت‌ها با اندازه‌های مناسب
-            font_title = ImageFont.truetype(title_font_file, 42)
-            font_label = ImageFont.truetype(title_font_file, 30)
-            font_main = ImageFont.truetype(font_file, 35)
-            font_info = ImageFont.truetype(font_file, 36)
-            font_website = ImageFont.truetype(title_font_file, 24)
-            font_phone = ImageFont.truetype(font_file, 22)
-            font_tiny = ImageFont.truetype(font_file, 18)
-            
-            font_loaded = True
-            
+                # بارگذاری فونت‌ها با اندازه‌های مناسب
+                font_title = ImageFont.truetype(persian_font, 42)
+                font_label = ImageFont.truetype(persian_font, 30)
+                font_main = ImageFont.truetype(persian_font, 35)
+                font_info = ImageFont.truetype(persian_font, 36)
+                font_website = ImageFont.truetype(persian_font, 24)
+                font_phone = ImageFont.truetype(persian_font, 22)
+                font_tiny = ImageFont.truetype(persian_font, 18)
+                
+                font_loaded = True
+                print("✅ PIL Persian fonts loaded successfully!")
+                
+                # Test Persian text
+                test_text = "تست متن فارسی"
+                try:
+                    bbox = draw.textbbox((0, 0), test_text, font=font_main)
+                    print(f"✅ Persian text test OK. Width: {bbox[2] - bbox[0]}px")
+                except Exception as e:
+                    print(f"❌ Persian text test failed: {e}")
+                
+            else:
+                raise Exception(f"No Persian font found! Searched: {persian_font}")
+                
         except Exception as e:
+            print(f"❌ Font loading error: {e}")
+            print("Using default fonts - Persian may show as boxes")
+            
             font_title = ImageFont.load_default()
-            font_label = ImageFont.load_default()
+            font_label = ImageFont.load_default() 
             font_main = ImageFont.load_default()
             font_info = ImageFont.load_default()
             font_website = ImageFont.load_default()
             font_phone = ImageFont.load_default()
             font_tiny = ImageFont.load_default()
+        
+        print(f"Font loaded successfully: {font_loaded}")
         
         # کادر اصلی با گوشه‌های گرد و ضخامت بیشتر
         draw.rounded_rectangle(
@@ -984,8 +1040,10 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         
         # ذخیره تصویر
         img.save(output_filename, dpi=(300, 300), quality=100)
+        print(f"✅ Label created and saved to: {output_filename}")
         
         return img
+
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -1014,9 +1072,11 @@ class MainApp(QMainWindow):
         
         main_layout.addWidget(tab_widget)
 
-# MODIFY your main function:
 def main():
     """تابع اصلی برنامه"""
+    print("=== APPLICATION STARTUP ===")
+    debug_fonts()  # Debug fonts at startup
+    
     if not PYQT_AVAILABLE:
         print("❌ PyQt6 در دسترس نیست. لطفاً نصب کنید:")
         print("pip install PyQt6")
@@ -1034,7 +1094,7 @@ def main():
         # تنظیم راست‌چین برای زبان‌های RTL
         app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         
-        window = MainApp()  # Changed from AddressLabelApp to MainApp
+        window = MainApp()
         window.show()
         
         sys.exit(app.exec())
