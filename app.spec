@@ -7,12 +7,11 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        # Bundle all Vazir font files
         ('Vazir-Bold.ttf', 'fonts'),
-        ('Vazir-Black.ttf', 'fonts'),
-        ('Vazir-Light.ttf', 'fonts'),
         ('Vazir-Medium.ttf', 'fonts'),
         ('Vazir-Regular.ttf', 'fonts'),
+        ('Vazir-Black.ttf', 'fonts'),
+        ('Vazir-Light.ttf', 'fonts'),
         ('Vazir-Thin.ttf', 'fonts'),
         ('Vazir-Variable.ttf', 'fonts'),
     ],

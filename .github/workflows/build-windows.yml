@@ -22,20 +22,15 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install PyQt6==6.7.0 Pillow==10.3.0 reportlab==4.2.0 pyinstaller==6.3.0
-        pip install arabic-reshaper==3.0.0 python-bidi==0.4.2
+        pip install arabic-reshaper==3.0.0 python-bidi==0.4.2 || echo "BiDi libraries failed, continuing without them"
         
-    - name: List font files
-      run: |
-        echo "Font files found:"
-        dir *.ttf
-        
-    - name: Build EXE with fonts and BiDi support
+    - name: Build EXE
       run: |
         pyinstaller app.spec
         
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: ImageTools-Windows-WithPersianFix
+        name: ImageTools-WithPersianFix
         path: dist/ImageTools.exe
         retention-days: 30
