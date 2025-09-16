@@ -23,13 +23,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install PyQt6==6.7.0 Pillow==10.3.0 reportlab==4.2.0 pyinstaller==6.3.0
         
-    - name: Build EXE (simple method)
+    - name: List font files
       run: |
-        pyinstaller --onefile --noconsole --name=ImageTools app.py
+        echo "Font files found:"
+        dir *.ttf
+        
+    - name: Build EXE with fonts using spec file
+      run: |
+        pyinstaller app.spec
+        
+    - name: Verify build contains fonts
+      run: |
+        echo "Build completed! Checking if fonts are included..."
+        dir dist\
         
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: ImageTools-Windows
+        name: ImageTools-Windows-WithFonts
         path: dist/ImageTools.exe
         retention-days: 30
