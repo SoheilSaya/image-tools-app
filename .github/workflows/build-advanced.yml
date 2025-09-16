@@ -1,0 +1,85 @@
+name: Build Windows EXE (Advanced)
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6==6.7.0 Pillow==10.3.0 reportlab==4.2.0 pyinstaller==6.3.0
+        
+    - name: Create icon (if not exists)
+      run: |
+        echo "Creating default icon..."
+        # This creates a simple default icon if you don't have one
+        python -c "
+        from PIL import Image, ImageDraw
+        img = Image.new('RGBA', (64, 64), (70, 130, 180, 255))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse([10, 10, 54, 54], fill=(255, 255, 255, 255))
+        draw.text((20, 20), '🏷️', fill=(70, 130, 180, 255))
+        img.save('icon.ico', format='ICO', sizes=[(64, 64)])
+        "
+        
+    - name: Build EXE using spec file
+      run: |
+        pyinstaller app.spec
+        
+    - name: Verify build
+      run: |
+        echo "Build completed!"
+        echo "Files in dist:"
+        dir dist\
+        echo "EXE size:"
+        powershell "Get-ChildItem dist\ImageTools.exe | Select-Object Name,Length"
+        
+    - name: Upload EXE
+      uses: actions/upload-artifact@v4
+      with:
+        name: ImageTools-${{ runner.os }}-${{ github.sha }}
+        path: dist/ImageTools.exe
+        retention-days: 90
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/ImageTools.exe
+        body: |
+          ## Image Tools v${{ github.ref_name }}
+          
+          Windows executable for the Image Tools application.
+          
+          ### Features:
+          - 🏷️ Address Label Maker (Persian/Farsi support)
+          - ✂️ Image Cropper (34mm x 34mm)
+          
+          ### Requirements:
+          - Windows 10/11 (64-bit)
+          - No Python installation required
+          
+          ### Usage:
+          1. Download ImageTools.exe
+          2. Double-click to run
+          3. No installation needed!
+          
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
