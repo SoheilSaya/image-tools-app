@@ -21,6 +21,27 @@ except ImportError:
     PYQT_AVAILABLE = False
     print("❌ PyQt6 not found. Install with: pip install PyQt6")
 
+
+try:
+    from arabic_reshaper import arabic_reshaper
+    from bidi.algorithm import get_display
+    BIDI_AVAILABLE = True
+except ImportError:
+    BIDI_AVAILABLE = False
+    print("⚠️ Arabic reshaper and bidi not available. Installing...")
+    import subprocess
+    import sys
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "arabic-reshaper", "python-bidi"])
+        from arabic_reshaper import arabic_reshaper
+        from bidi.algorithm import get_display
+        BIDI_AVAILABLE = True
+        print("✅ Successfully installed arabic-reshaper and python-bidi")
+    except:
+        BIDI_AVAILABLE = False
+        print("❌ Failed to install text processing libraries")
+              
+
 # ADD FONT DEBUG FUNCTIONS
 def debug_fonts():
     """Debug font paths and availability"""
@@ -79,7 +100,22 @@ def debug_fonts():
     print(f"Selected font: {found_font}")
     print("=== FONT DEBUG END ===")
     return found_font
-
+def fix_persian_text(text):
+    """Fix Persian/Arabic text for proper display in PIL"""
+    if not BIDI_AVAILABLE:
+        return text
+    
+    try:
+        # First reshape the Arabic/Persian text to connect letters properly
+        reshaped_text = arabic_reshaper.reshape(text)
+        
+        # Then apply bidirectional algorithm for proper right-to-left display
+        bidi_text = get_display(reshaped_text)
+        
+        return bidi_text
+    except Exception as e:
+        print(f"❌ Error processing Persian text: {e}")
+        return text
 class ImageCropperWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -737,11 +773,11 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
             lines.append(current_line)
         
         return lines
-    
-    def create_address_label(self, sender_info, receiver_info, output_filename="address_label.png"):
-        """تابع ایجاد برچسب آدرس - WITH FONT DEBUGGING"""
         
-        print("=== CREATING LABEL WITH FONT DEBUG ===")
+    def create_address_label(self, sender_info, receiver_info, output_filename="address_label.png"):
+        """تابع ایجاد برچسب آدرس - با پشتیبانی کامل از متن فارسی"""
+        
+        print("=== CREATING LABEL WITH PERSIAN TEXT FIX ===")
         
         # Debug fonts first
         persian_font = debug_fonts()
@@ -761,7 +797,7 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         img = Image.new('L', (width, height), white)
         draw = ImageDraw.Draw(img)
         
-        # تلاش برای بارگذاری فونت‌های فارسی WITH DEBUG
+        # تلاش برای بارگذاری فونت‌های فارسی
         font_loaded = False
         try:
             if persian_font and os.path.exists(persian_font):
@@ -779,20 +815,19 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
                 font_loaded = True
                 print("✅ PIL Persian fonts loaded successfully!")
                 
-                # Test Persian text
+                # Test Persian text with BiDi
                 test_text = "تست متن فارسی"
-                try:
-                    bbox = draw.textbbox((0, 0), test_text, font=font_main)
-                    print(f"✅ Persian text test OK. Width: {bbox[2] - bbox[0]}px")
-                except Exception as e:
-                    print(f"❌ Persian text test failed: {e}")
-                
+                fixed_test = fix_persian_text(test_text)
+                print(f"Original: {test_text}")
+                print(f"Fixed: {fixed_test}")
+                print(f"BiDi available: {BIDI_AVAILABLE}")
+                    
             else:
                 raise Exception(f"No Persian font found! Searched: {persian_font}")
                 
         except Exception as e:
             print(f"❌ Font loading error: {e}")
-            print("Using default fonts - Persian may show as boxes")
+            print("Using default fonts")
             
             font_title = ImageFont.load_default()
             font_label = ImageFont.load_default() 
@@ -832,8 +867,8 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         # خط زیر هدر
         draw.line([(10, header_height), (width-10, header_height)], fill=black, width=3)
         
-        # عنوان در وسط هدر
-        title_text = "برچسب پستی"
+        # عنوان در وسط هدر - FIXED PERSIAN TEXT
+        title_text = fix_persian_text("برچسب پستی")
         bbox = draw.textbbox((0, 0), title_text, font=font_title)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
@@ -866,8 +901,8 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
             width=2
         )
         
-        # متن فرستنده - بالاتر در کادر
-        sender_label_text = "فرستنده"
+        # متن فرستنده - FIXED PERSIAN TEXT
+        sender_label_text = fix_persian_text("فرستنده")
         bbox = draw.textbbox((0, 0), sender_label_text, font=font_label)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
@@ -875,27 +910,27 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         y_label = label_y + (label_height - text_height) // 2 - 3
         draw.text((x_label, y_label), sender_label_text, white, font=font_label)
         
-        # اطلاعات فرستنده - راست چین
+        # اطلاعات فرستنده - راست چین - FIXED PERSIAN TEXT
         right_margin = 60
         info_y = section1_start + 5
-        max_text_width = width - right_margin - 220  # فضای در نظر گرفته شده برای متن
+        max_text_width = width - right_margin - 220
         
         # نام - راست چین
-        text = f"نام: {sender_info[0]}"
+        text = fix_persian_text(f"نام: {sender_info[0]}")
         bbox = draw.textbbox((0, 0), text, font=font_main)
         text_width = bbox[2] - bbox[0]
         draw.text((width - right_margin - text_width, info_y), text, black, font=font_main)
         info_y += 35
         
-        # آدرس - راست چین (تکی)
-        text = f"آدرس: {sender_info[1]}"
+        # آدرس - راست چین
+        text = fix_persian_text(f"آدرس: {sender_info[1]}")
         bbox = draw.textbbox((0, 0), text, font=font_info)
         text_width = bbox[2] - bbox[0]
         draw.text((width - right_margin - text_width, info_y), text, black, font=font_info)
         info_y += 35
         
         # کدپستی و تلفن - راست چین
-        text = f"کدپستی: {sender_info[2]}  |  تلفن: {sender_info[3]}"
+        text = fix_persian_text(f"کدپستی: {sender_info[2]}  |  تلفن: {sender_info[3]}")
         bbox = draw.textbbox((0, 0), text, font=font_info)
         text_width = bbox[2] - bbox[0]
         draw.text((width - right_margin - text_width, info_y), text, black, font=font_info)
@@ -928,8 +963,8 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
             width=2
         )
         
-        # متن گیرنده - بالاتر در کادر
-        receiver_label_text = "گیرنده"
+        # متن گیرنده - FIXED PERSIAN TEXT
+        receiver_label_text = fix_persian_text("گیرنده")
         bbox = draw.textbbox((0, 0), receiver_label_text, font=font_label)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
@@ -937,19 +972,19 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         y_label = label_y + (label_height - text_height) // 2 - 3
         draw.text((x_label, y_label), receiver_label_text, white, font=font_label)
         
-        # اطلاعات گیرنده - راست چین
+        # اطلاعات گیرنده - راست چین - FIXED PERSIAN TEXT
         info_y = section2_start + 5
         
         # نام - راست چین
-        text = f"نام: {receiver_info[0]}"
+        text = fix_persian_text(f"نام: {receiver_info[0]}")
         bbox = draw.textbbox((0, 0), text, font=font_main)
         text_width = bbox[2] - bbox[0]
         draw.text((width - right_margin - text_width, info_y), text, black, font=font_main)
         info_y += 35
         
         # آدرس - راست چین با قابلیت تقسیم به چند خط
-        address_prefix = "آدرس: "
-        address_text = receiver_info[1]
+        address_prefix = fix_persian_text("آدرس: ")
+        address_text = fix_persian_text(receiver_info[1])
         full_address = address_prefix + address_text
         
         # بررسی آیا آدرس در یک خط جا می‌شود
@@ -961,21 +996,22 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
             draw.text((width - right_margin - text_width, info_y), full_address, black, font=font_info)
             info_y += 35
         else:
-            # اگر نمی‌شود، تقسیم کن
+            # اگر نمی‌شود، تقسیم کن - BUT FIX EACH LINE
             wrapped_lines = self.wrap_text(draw, full_address, font_info, max_text_width)
             for line in wrapped_lines:
-                bbox = draw.textbbox((0, 0), line, font=font_info)
+                fixed_line = fix_persian_text(line)
+                bbox = draw.textbbox((0, 0), fixed_line, font=font_info)
                 text_width = bbox[2] - bbox[0]
-                draw.text((width - right_margin - text_width, info_y), line, black, font=font_info)
+                draw.text((width - right_margin - text_width, info_y), fixed_line, black, font=font_info)
                 info_y += 35
         
         # کدپستی و تلفن - راست چین
-        text = f"کدپستی: {receiver_info[2]}  |  تلفن: {receiver_info[3]}"
+        text = fix_persian_text(f"کدپستی: {receiver_info[2]}  |  تلفن: {receiver_info[3]}")
         bbox = draw.textbbox((0, 0), text, font=font_info)
         text_width = bbox[2] - bbox[0]
         draw.text((width - right_margin - text_width, info_y), text, black, font=font_info)
         
-        # ================== فوتر - وب‌سایت و شماره در وسط ==================
+        # ================== فوتر ==================
         footer_y = height - 85
         
         # کادر فوتر با پس‌زمینه
@@ -999,8 +1035,8 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         first_line_y = footer_y + 15
         
         # محاسبه عرض کل متن برای وسط‌چین
-        website_text = "NokhbehSho.com"
-        phone_text = "021-91091722"
+        website_text = "NokhbehSho.com"  # English text doesn't need BiDi
+        phone_text = "021-91091722"      # Numbers don't need BiDi
         separator = " | "
         
         # محاسبه عرض هر بخش
@@ -1028,8 +1064,8 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         # شماره تلفن
         draw.text((start_x + website_width + sep_width, first_line_y + 2), phone_text, black, font=font_phone)
         
-        # خط دوم: متن توضیحی در وسط
-        desc_text = "مرجع تخصصی آموزش رباتیک و هوش مصنوعی کودکان و نوجوانان"
+        # خط دوم: متن توضیحی در وسط - FIXED PERSIAN TEXT
+        desc_text = fix_persian_text("مرجع تخصصی آموزش رباتیک و هوش مصنوعی کودکان و نوجوانان")
         bbox = draw.textbbox((0, 0), desc_text, font=font_tiny)
         text_width = bbox[2] - bbox[0]
         x = (width - text_width) // 2
@@ -1040,9 +1076,10 @@ class AddressLabelWidget(QWidget):  # Change from QMainWindow to QWidget
         
         # ذخیره تصویر
         img.save(output_filename, dpi=(300, 300), quality=100)
-        print(f"✅ Label created and saved to: {output_filename}")
+        print(f"✅ Label created with proper Persian text: {output_filename}")
         
         return img
+
 
 class MainApp(QMainWindow):
     def __init__(self):
